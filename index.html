@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Le Noteur de Tête V2</title>
+    <title>Note Moi</title>
     <style>
+        /* --- STYLES DE BASE --- */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #2c3e50;
@@ -18,15 +19,21 @@
             text-align: center;
             padding: 10px;
             box-sizing: border-box;
+            /* Empêche le scroll élastique sur mobile */
+            overflow: hidden; 
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
 
         h1 { margin-bottom: 10px; font-size: 1.5rem; }
 
+        /* --- CONTENEUR VIDÉO/PHOTO --- */
         .camera-container {
             position: relative;
             width: 100%;
             max-width: 400px;
-            height: 300px; /* Hauteur fixe pour éviter les sauts */
+            height: 300px;
             border: 4px solid #ecf0f1;
             border-radius: 15px;
             overflow: hidden;
@@ -37,8 +44,23 @@
         video {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Remplit bien le cadre */
+            object-fit: cover;
         }
+
+        /* L'image capturée, cachée par défaut, s'affiche par-dessus la vidéo */
+        #captured-image {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 10;
+        }
+
+        /* Le canvas sert juste à la capture technique, il reste caché */
+        canvas { display: none; }
 
         /* --- SÉLECTEUR DE GENRE --- */
         .gender-selector {
@@ -62,59 +84,65 @@
         }
 
         .gender-btn.active {
-            background-color: #3498db;
-            color: white;
-            font-weight: bold;
+            background-color: #3498db; color: white; font-weight: bold;
             box-shadow: 0 4px 10px rgba(52, 152, 219, 0.4);
         }
-
         .gender-btn.active.femme {
-            background-color: #e84393; /* Rose pour femme */
+            background-color: #e84393;
             box-shadow: 0 4px 10px rgba(232, 67, 147, 0.4);
         }
 
-        /* --- BOUTON PHOTO --- */
-        #snap {
+        /* --- BOUTONS D'ACTION --- */
+        .main-btn {
             padding: 15px 40px;
             font-size: 1.2rem;
             background-color: #27ae60;
             color: white;
             border: none;
             border-radius: 50px;
-            cursor: pointer;
-            font-weight: bold;
+            cursor: pointer; font-weight: bold;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .main-btn:active { transform: scale(0.95); }
+
+        /* Conteneur pour les boutons Reprendre/Sauvegarder (caché au début) */
+        #actions-container {
+            display: none; /* Caché par défaut */
+            gap: 15px;
+            margin-top: 20px;
         }
 
-        #snap:active { transform: scale(0.95); }
+        .action-btn {
+            padding: 12px 25px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer; font-weight: bold;
+            transition: transform 0.1s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .action-btn:active { transform: scale(0.95); }
+
+        #retake-btn { background-color: #7f8c8d; color: white; }
+        #save-btn { background-color: #2980b9; color: white; }
 
         /* --- RÉSULTATS --- */
-        #result {
-            margin-top: 20px;
-            min-height: 100px;
+        #result-area {
+            margin-top: 15px;
+            min-height: 90px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .score {
-            font-size: 4rem;
-            font-weight: 800;
-            color: #f1c40f;
-            display: block;
+            font-size: 4rem; font-weight: 800; color: #f1c40f;
             text-shadow: 2px 2px 0px #000;
             animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-
-        .comment {
-            font-size: 1.3rem;
-            margin-top: 10px;
-            font-weight: 300;
-        }
-
-        .loader {
-            display: none;
-            font-size: 1.2rem;
-            color: #bdc3c7;
-        }
+        .comment { font-size: 1.2rem; margin-top: 5px; font-weight: 300; }
+        .loader { display: none; font-size: 1.2rem; color: #bdc3c7; margin-top: 20px;}
 
         @keyframes popIn {
             0% { transform: scale(0); }
@@ -124,104 +152,120 @@
 </head>
 <body>
 
-    <h1>✨ Note mon Charisme ✨</h1>
+    <h1>✨ Note Moi ✨</h1>
 
     <div class="camera-container">
         <video id="video" autoplay playsinline muted></video>
+        <img id="captured-image" alt="Votre photo">
     </div>
+    
+    <canvas id="canvas"></canvas>
 
-    <div class="gender-selector">
+    <div class="gender-selector" id="genderSelectBox">
         <button class="gender-btn active" onclick="setGender('homme', this)">Homme 👨</button>
         <button class="gender-btn" onclick="setGender('femme', this)">Femme 👩</button>
     </div>
 
-    <button id="snap">NOTER MA TÊTE</button>
+    <button id="snap-btn" class="main-btn">NOTER MA TÊTE 📸</button>
 
-    <div id="result">
-        <div class="loader" id="loader">Calcul du charme... ⏳</div>
+    <div id="result-area">
+        <div class="loader" id="loader">Analyse biométrique complexe... ⏳</div>
         <div id="scoreDisplay"></div>
     </div>
 
+    <div id="actions-container">
+        <button id="retake-btn" class="action-btn">🔄 Reprendre</button>
+        <button id="save-btn" class="action-btn">💾 Sauvegarder</button>
+    </div>
+
+
     <script>
+        // --- ÉLÉMENTS DU DOM ---
         const video = document.getElementById('video');
-        const button = document.getElementById('snap');
+        const canvas = document.getElementById('canvas');
+        const capturedImage = document.getElementById('captured-image');
+        
+        const snapBtn = document.getElementById('snap-btn');
+        const actionsContainer = document.getElementById('actions-container');
+        const retakeBtn = document.getElementById('retake-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const genderSelectBox = document.getElementById('genderSelectBox');
+
         const loader = document.getElementById('loader');
         const scoreDisplay = document.getElementById('scoreDisplay');
         
-        let currentGender = 'homme'; // Par défaut
+        let currentGender = 'homme';
+        let stream = null;
 
-        // Commentaires personnalisés selon le genre
+        // --- DONNÉES ---
         const comments = {
             homme: {
-                mid: ["Pas mal du tout, mon pote.", "Y'a du potentiel.", "Solide.", "Propre."],
-                high: ["Quel BG !", "Le futur James Bond ?", "Incroyable charisme.", "Roi de la soirée !"]
+                mid: ["Pas mal du tout.", "Y'a du potentiel.", "Solide.", "Propre.", "Charme discret."],
+                high: ["Quel BG !", "Futur mannequin ?", "Incroyable charisme.", "Roi de la soirée !", "Légendaire."]
             },
             femme: {
-                mid: ["Très charmante !", "Joli sourire.", "Rayonnante.", "Très mignonne."],
-                high: ["Une vraie déesse !", "Quelle élégance !", "Magnifique !", "Top modèle !", "Quelle pain"]
+                mid: ["Très charmante !", "Joli sourire.", "Rayonnante.", "Très mignonne.", "Belle prestance."],
+                high: ["Une vraie déesse !", "Quelle élégance !", "Magnifique !", "Top modèle !", "Éblouissante."]
             }
         };
+
+        // --- FONCTIONS ---
 
         // 1. Gestion du genre
         function setGender(gender, btnElement) {
             currentGender = gender;
-            
-            // Gestion visuelle des boutons
             document.querySelectorAll('.gender-btn').forEach(b => {
-                b.classList.remove('active');
-                b.classList.remove('femme'); // Retirer la couleur rose
+                b.classList.remove('active', 'femme');
             });
-            
             btnElement.classList.add('active');
-            if(gender === 'femme') {
-                btnElement.classList.add('femme'); // Ajouter la couleur rose
-            }
+            if(gender === 'femme') btnElement.classList.add('femme');
         }
 
         // 2. Activer la caméra
         async function startCamera() {
             try {
-                // { facingMode: "user" } force la caméra selfie sur mobile
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" } 
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
                 });
                 video.srcObject = stream;
             } catch (err) {
-                scoreDisplay.innerHTML = "⚠️ Caméra bloquée. Active-la dans les réglages.";
+                scoreDisplay.innerHTML = "⚠️ Erreur caméra. Vérifie les permissions.";
+                snapBtn.disabled = true;
+                snapBtn.style.backgroundColor = "#7f8c8d";
             }
         }
 
-        // 3. Bouton Photo
-        button.addEventListener('click', () => {
+        // 3. Prendre la photo (Click principal)
+        snapBtn.addEventListener('click', () => {
+            // a. Interface : Préparer le chargement
+            snapBtn.style.display = 'none'; // Cacher le gros bouton
+            genderSelectBox.style.display = 'none'; // Cacher le sélecteur pendant le résultat
             scoreDisplay.innerHTML = '';
             loader.style.display = 'block';
-            button.disabled = true;
-            button.style.opacity = "0.5";
 
-            // Petit délai pour le suspense
+            // b. Capture technique : Dessiner la vidéo sur le canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            // c. Affichage : Convertir en image et afficher par-dessus la vidéo
+            capturedImage.src = canvas.toDataURL('image/png');
+            capturedImage.style.display = 'block';
+
+            // d. Attendre un peu pour le suspense
             setTimeout(() => {
-                generateScore();
                 loader.style.display = 'none';
-                button.disabled = false;
-                button.style.opacity = "1";
-            }, 1000);
+                generateScore();
+                // e. Afficher les boutons d'action
+                actionsContainer.style.display = 'flex';
+            }, 1500);
         });
 
-        // 4. Génération du score (5 à 10)
+        // 4. Générer le score
         function generateScore() {
-            // Math.random() * 6 donne un chiffre entre 0 et 5.99
-            // + 5 décale le tout pour avoir entre 5 et 10.99
-            const score = Math.floor(Math.random() * 6) + 5;
-            
-            let commentList;
-            
-            // Choix des commentaires (Mid = 5, 6, 7 / High = 8, 9, 10)
-            if (score <= 7) {
-                commentList = comments[currentGender].mid;
-            } else {
-                commentList = comments[currentGender].high;
-            }
-
+            const score = Math.floor(Math.random() * 6) + 5; // Entre 5 et 10
+            const commentType = score <= 7 ? 'mid' : 'high';
+            const commentList = comments[currentGender][commentType];
             const randomComment = commentList[Math.floor(Math.random() * commentList.length)];
 
             scoreDisplay.innerHTML = `
@@ -230,6 +274,26 @@
             `;
         }
 
+        // 5. Bouton Reprendre
+        retakeBtn.addEventListener('click', () => {
+            // Réinitialiser l'interface
+            capturedImage.style.display = 'none'; // Cacher la photo
+            scoreDisplay.innerHTML = '';
+            actionsContainer.style.display = 'none'; // Cacher les petits boutons
+            snapBtn.style.display = 'inline-block'; // Remontrer le gros bouton
+            genderSelectBox.style.display = 'flex'; // Remontrer le sélecteur
+        });
+
+        // 6. Bouton Sauvegarder
+        saveBtn.addEventListener('click', () => {
+            // Créer un lien temporaire pour télécharger l'image
+            const link = document.createElement('a');
+            link.download = `ma-tete-${currentGender}-${Date.now()}.png`;
+            link.href = capturedImage.src;
+            link.click(); // Simuler le clic pour lancer le téléchargement
+        });
+
+        // Lancement
         startCamera();
     </script>
 
